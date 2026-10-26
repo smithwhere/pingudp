@@ -251,17 +251,33 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPAR
         control(L"STATIC", L"逐次结果", 0, 16, 105, 120, 24, 0);
         output_edit = control(L"EDIT", L"", WS_BORDER | WS_VSCROLL | ES_MULTILINE |
                               ES_AUTOVSCROLL | ES_READONLY, 16, 130, 709, 348, 0);
+        SendMessageW(output_edit, EM_SETLIMITTEXT, 1048576, 0);
         status_label = control(L"STATIC", L"输入 VPS 公网 IP，然后点击开始。", 0, 16, 494, 709, 28, 0);
         return 0;
     case WM_COMMAND:
         if (LOWORD(wparam) == ID_START) start_probe();
         else if (LOWORD(wparam) == ID_STOP && stop_event) SetEvent(stop_event);
         return 0;
-    case WM_LOG_LINE:
-        SendMessageW(output_edit, EM_SETSEL, (WPARAM)-1, (LPARAM)-1);
-        SendMessageW(output_edit, EM_REPLACESEL, FALSE, lparam);
-        SendMessageW(output_edit, EM_REPLACESEL, FALSE, (LPARAM)L"\r\n");
+    case WM_LOG_LINE: {
+        WCHAR line[1024];
+        int length;
+        int lines = (int)SendMessageW(output_edit, EM_GETLINECOUNT, 0, 0);
+        /* Keep the most recent 2000 lines during continuous probing. */
+        if (lines > 2000) {
+            LRESULT cut = SendMessageW(output_edit, EM_LINEINDEX, lines - 2000, 0);
+            if (cut > 0) {
+                SendMessageW(output_edit, EM_SETSEL, 0, cut);
+                SendMessageW(output_edit, EM_REPLACESEL, FALSE, (LPARAM)L"");
+            }
+        }
+        swprintf(line, 1024, L"%ls\r\n", (const WCHAR *)lparam);
+        /* -1 as the start only deselects; use the actual text length to append. */
+        length = GetWindowTextLengthW(output_edit);
+        SendMessageW(output_edit, EM_SETSEL, (WPARAM)length, (LPARAM)length);
+        SendMessageW(output_edit, EM_REPLACESEL, FALSE, (LPARAM)line);
+        SendMessageW(output_edit, EM_SCROLLCARET, 0, 0);
         return 0;
+    }
     case WM_STATUS_TEXT:
         SetWindowTextW(status_label, (const WCHAR *)lparam);
         return 0;
@@ -304,7 +320,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
     klass.hCursor = LoadCursorW(NULL, IDC_ARROW);
     klass.hIcon = LoadIconW(NULL, IDI_APPLICATION);
     if (!RegisterClassW(&klass)) { WSACleanup(); return 2; }
-    window = CreateWindowExW(0, klass.lpszClassName, L"UDP Ping - Linux VPS",
+    window = CreateWindowExW(0, klass.lpszClassName, L"UDP Ping 1.0.1 - Linux VPS",
                             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
                             CW_USEDEFAULT, CW_USEDEFAULT, 755, 570,
                             NULL, NULL, instance, NULL);

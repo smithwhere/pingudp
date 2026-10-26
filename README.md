@@ -6,15 +6,7 @@ Windows 图形界面 UDP 往返延迟探测器，配套 Linux VPS 回显服务�
 
 从 [Releases](https://github.com/smithwhere/pingudp/releases) 下载 `udpping.exe`，在 Windows x64 上双击运行。输入 VPS 公网 IPv4 地址或域名，端口默认 `9000`，点击“开始”。“次数”设为 `0` 时持续探测，点击“停止”查看统计；间隔和超时单位都是毫秒。
 
-Linux VPS 安装了 Python 3 后，在本仓库目录运行：
-
-```bash
-python3 server/udp_echo.py --port 9000
-```
-
-这个命令在前台运行，按 Ctrl+C 停止。需要长期运行时可交由 systemd 管理。云平台安全组和 VPS 防火墙须允许 Windows 当前公网 IP 访问 `9000/udp`；建议只允许该来源，而不是向整个互联网开放回显服务。
-
-如果已安装 UFW，需要允许所有 IPv4 来源访问 UDP 9000，可用 root 执行以下完整命令。它先添加 UFW 规则，再启动回显服务（不会启用当前处于 inactive 状态的 UFW，也不会修改 Vultr 云防火墙）：
+在 Linux VPS 中以 root 执行下面这条完整命令，先允许所有来源访问 UDP 9000，再启动回显服务。需要已安装 Python 3、UFW 和 ss。
 
 ```bash
 ufw allow 9000/udp && python3 - <<'PY'
@@ -32,7 +24,7 @@ while True:
 PY
 ```
 
-执行期间保持 SSH 窗口打开。若端口已经被之前的回显程序占用，先在原窗口按 Ctrl+C 停止旧进程。
+执行期间保持 SSH 窗口打开。若端口已经被之前的回显程序占用，先在原窗口按 Ctrl+C 停止旧进程。UFW 处于 inactive 时，这条命令不会启用 UFW；Vultr 云防火墙也需要单独放行 UDP 9000。
 
 服务端只回传 16 字节、以 `UPNG` 开头的数据报。客户端在包内加入会话标识和序号，检查来源与内容，使用高精度计时器计算往返时间。Windows 原生 `ping` 使用 ICMP，不会测到这个 UDP 服务的表现。
 
@@ -53,6 +45,8 @@ x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -municode -mwindows -s -o udpp
 也可执行 `sh build-windows.sh` 同时编译图形界面和命令行版本。
 
 Release 的 `udpping.exe` 为 Windows x64 图形界面程序。源码也包含命令行版本，可用相同编译器去掉 `-municode -mwindows` 并替换源码路径构建。
+
+图形界面保留最近约 2000 行日志。新日志始终追加在末尾，点击日志中的旧内容不会改变新结果的显示位置。
 
 ## 验证
 
